@@ -1,64 +1,42 @@
-require "faraday"
-require "faraday_middleware"
-require "json"
-require "pp"
+module LineBotApi
 
-class LineClient
-  module ContentType
-    TEXT = 1
-    IMAGE = 2
-    VIDEO = 3
-    AUDIO = 4
-    LOCATION = 7
-    STICKER = 8
-    CONTACT = 10
-  end
-  module ToType
-    USER = 1
-  end
+  class Client
+    TO_CHANNEL = 1383378250
+    EVENT_TYPE = "138311608800106203"
+    EVENT_URL = 'https://trialbot-api.line.me/v1/events'
+    attr_accessor :channel_id, :channel_secret, :channel_mid, :proxy
 
-  END_POINT = "https://trialbot-api.line.me"
-  TO_CHANNEL = 1383378250 # this is fixed value
-  EVENT_TYPE = "138311608800106203" # this is fixed value
-
-  def initialize(channel_id, channel_secret, channel_mid, proxy = nil)
-    @channel_id = channel_id
-    @channel_secret = channel_secret
-    @channel_mid = channel_mid
-    @proxy = proxy
-  end
-
-  def post(path, data)
-    client = Faraday.new(:url => END_POINT) do |conn|
-      conn.request :json
-      conn.response :json, :content_type => /\bjson$/
-      conn.adapter Faraday.default_adapter
-      conn.proxy @proxy
+    def initialize(options = {})
+      options.each do |key, value|
+        instance_variable_set("@#{key}", value)
+      end
     end
 
-    res = client.post do |request|
-      request.url path
-      request.headers = {
-          'Content-type' => 'application/json; charset=UTF-8',
-          'X-Line-ChannelID' => @channel_id,
-          'X-Line-ChannelSecret' => @channel_secret,
-          'X-Line-Trusted-User-With-ACL' => @channel_mid
+    def credentials
+      {
+        "X-Line-ChannelID": channel_id,
+        "X-Line-ChannelSecret": channel_secret,
+        "X-Line-Trusted-User-With-ACL": channel_mid,
       }
-      request.body = data
     end
-    res
-  end
 
-  def send(line_ids, message)
-    post('/v1/events', {
-        to: line_ids,
-        content: {
-            contentType: ContentType::TEXT,
-            toType: ToType::USER,
-            text: message
-        },
+    def send_text_message(to, message)
+      RestClient.proxy = proxy unless proxy.nil?
+      request_headers = credentials.merge({
+        "Content-Type": "application/json",
+      })
+      request_params = {
+        to: [to],
         toChannel: TO_CHANNEL,
-        eventType: EVENT_TYPE
-    })
+        eventType: EVENT_TYPE,
+        content: {
+          contentType: 1,
+          toType: 1,
+          text: message,
+        }
+      }
+      RestClient.post EVENT_URL, request_params.to_json, request_headers
+    end
+
   end
 end
